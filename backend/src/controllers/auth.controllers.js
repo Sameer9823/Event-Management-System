@@ -289,6 +289,4 @@ export {
     getCurrentUser,
     updateAccountDetails,
     updatedAvatar
-
-
 }

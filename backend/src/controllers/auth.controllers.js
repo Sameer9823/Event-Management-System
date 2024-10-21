@@ -150,10 +150,132 @@ const logout = asyncHandler(async(req, res) => {
 //refresh token
 const refreshToken = asyncHandler(async(req, res) => {
 
-    
+    const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken
+
+    if(!incomingRefreshToken){
+        throw new ApiError(401, "Unauthorized");
+    }
+
+   try {
+     const decoded = jwt.verify(
+         incomingRefreshToken, 
+         process.env.REFRESH_TOKEN_SECRET
+     )
+     const user = await User.findById(decoded?._id)
+     if(!user) {
+         throw new ApiError(401, 'invalid rfresh token')
+     }
+     if(incomingRefreshToken !== user?.refreshToken){
+         throw new ApiError(401, "Refreshtoken is expire or used");
+     }
+
+     const options = {
+         httpOnly: true,
+         secure: true
+     }
+     const {accessToken, newRefreshToken} = await generateAccessandRefreshToken(
+         user._id
+     )
+
+     return res
+     .status(200)
+     .cookie("accessToken", accessToken, options)
+     .cookie("refreshToken", newRefreshToken, options)
+     .json(
+         new ApiResponse(200, {
+             accessToken,
+             refreshToken: newRefreshToken,
+             user
+         }, "Token refreshed successfully")
+     )
+    }catch (err) {
+        throw new ApiError(401, err?.message || "Invalid refresh token");
+    }
 
 
 })
+
+//update password
+
+const changeCurrentPassword = asyncHandler(async(req, res) => {
+
+    const {oldPassword, newPassword} = req.body
+
+    const user = await User.findById(req.user?._id)
+
+    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
+
+    if(!isPasswordCorrect){
+        throw new ApiError(400, "Old password is incorrect");
+    }
+
+    user.password = newPassword
+    await user.save({validateBeforeSave: false})
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, {}, "Password changed successfully")
+    )
+})
+
+//get current user
+const getCurrentUser = asyncHandler(async(req, res) => {
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, req.user, "User retrieved successfully")
+    )
+})
+
+//update account details
+
+const updateAccountDetails = asyncHandler(async(req, res) => {
+    const {name, email} = req.body
+
+    if(!name || !email){
+        throw new ApiError(400, "All fields are required");
+    }
+
+    const user = await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set: {
+                name,
+                email
+            }
+        },
+        {
+            new: true
+        }
+    ).select("-password")
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, user, "Account details updated successfully")
+    )
+})
+
+//update avatar
+const updatedAvatar = asyncHandler(async(req, res) => {
+    const avatarLocalPath = req.file?.path
+
+    if(!avatarLocalPath){
+        throw new ApiError(400, "Avatar is required");
+    }
+
+
+    const user = await User.findById(req.user?._id)
+
+    if(user?.avatar){
+        const oldAvatarPublicId = user.avatar.split('/').pop().split('.')[0];
+
+        await deleteFromCloudinary(oldAvatarPublicId)
+    }
+})
+
+
 
 
 
@@ -161,6 +283,12 @@ const refreshToken = asyncHandler(async(req, res) => {
 export {
     register,
     login,
-    logout
+    logout,
+    refreshToken,
+    changeCurrentPassword,
+    getCurrentUser,
+    updateAccountDetails,
+    updatedAvatar
+
 
 }

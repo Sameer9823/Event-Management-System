@@ -25,7 +25,7 @@ router.route("/register").post(
 )
 
 router.route("/login").post(login)
-router.route("/logout".post(verifyJWT, logout))
+router.route("/logout").post(verifyJWT, logout)
 router.route("/change-password").post(verifyJWT, changeCurrentPassword)
 router.route("/refresh-token").post(refreshToken)
 router.route("/current-user").get(verifyJWT, getCurrentUser)
